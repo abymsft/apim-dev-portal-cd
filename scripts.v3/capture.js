@@ -5,24 +5,23 @@
  * 1) Clone the api-management-developer-portal repository:
  *    git clone https://github.com/Azure/api-management-developer-portal.git
  * 
- * 2) Install NPM  packages:
+ * 2) Install NPM packages:
  *    npm install
  * 
- * 3) Run this script with a valid combination of arguments:
- *    node ./capture ^
- *   --subscriptionId < your subscription ID > ^
- *   --resourceGroupName < your resource group name > ^
- *   --serviceName < your service name >
+ * 3) Set up authentication using one of these methods:
+ *    - Service Principal: Set AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+ *    - Managed Identity: Set AZURE_CLIENT_ID (in Azure environments)
+ *    - Azure CLI: Run 'az login' (fallback option)
+ * 
+ * 4) Run this script:
+ *    node ./capture --subscriptionId <id> --resourceGroupName <name> --serviceName <name>
  */
 
 const path = require("path");
 const { ImporterExporter } = require("./utils");
 
 const yargs = require('yargs')
-    .example(`node ./capture ^ \r
-     --subscriptionId "< your subscription ID >" ^ \r
-     --resourceGroupName "< your resource group name >" ^ \r
-     --serviceName "< your service name >"\n`)
+    .example(`node ./capture --subscriptionId "<subscription-id>" --resourceGroupName "<resource-group>" --serviceName "<service-name>"`)
     .option('subscriptionId', {
         type: 'string',
         description: 'Azure subscription ID.',
@@ -44,98 +43,94 @@ const yargs = require('yargs')
     .option('folder', {
         type: 'string',
         default: '../dist/snapshot',
-        description: 'The path to the folder which will contain the content of the portal',
-        example: '../dist/snapshot',
-        demandOption: false
+        description: 'The path to the folder which will contain the content of the portal'
     })
     .option('timestamp', {
         type: 'boolean',
         description: 'Adds a timestamp to the folder where the content is stored',
-        demandOption: false
+        default: false
     })
     .option('tenantId', {
         type: 'string',
-        description: 'tenant ID.',
-        default: process.env.AZURE_TENANT_ID,
-        demandOption: false
+        description: 'Azure tenant ID (optional, can use AZURE_TENANT_ID env var)',
+        default: process.env.AZURE_TENANT_ID
     })
     .option('servicePrincipal', {
         type: 'string',
-        description: 'service principal ID.',
-        default: process.env.AZURE_CLIENT_ID,
-        demandOption: false
+        description: 'Service principal client ID (optional, can use AZURE_CLIENT_ID env var)',
+        default: process.env.AZURE_CLIENT_ID
     })
     .option('servicePrincipalSecret', {
         type: 'string',
-        description: 'service principal secret.',
-        default: process.env.AZURE_CLIENT_SECRET,
-        demandOption: false
+        description: 'Service principal secret (optional, can use AZURE_CLIENT_SECRET env var)',
+        default: process.env.AZURE_CLIENT_SECRET
     })
     .help()
     .argv;
 
 async function capture() {
+    try {
+        // Validate required parameters
+        if (!yargs.subscriptionId || !yargs.resourceGroupName || !yargs.serviceName) {
+            throw new Error('Missing required parameters: subscriptionId, resourceGroupName, and serviceName are required');
+        }
 
-    // make the folder path understandable if running in Windows
-    const folder = yargs.folder.split("\\").join("/");
+        // Use path.resolve for proper cross-platform path handling
+        let absoluteFolder = path.resolve(yargs.folder);
 
-    // get the absolute path
-    var absoluteFolder = path.resolve(folder);
+        // Add timestamp if requested
+        if (yargs.timestamp) {
+            const timestamp = new Date();
+            const postfix = "-" +
+                timestamp.getFullYear() +
+                makeTwo(timestamp.getMonth() + 1) +
+                makeTwo(timestamp.getDate()) +
+                makeTwo(timestamp.getHours()) +
+                makeTwo(timestamp.getMinutes()) +
+                makeTwo(timestamp.getSeconds());
 
-    // add the timestamp to the path if requested
-    if (yargs.timestamp) {
-        const timestamp = new Date();
-        const postfix = "-" +
-            timestamp.getFullYear() +
-            makeTwo(timestamp.getMonth() + 1) +
-            makeTwo(timestamp.getDate()) +
-            makeTwo(timestamp.getHours()) +
-            makeTwo(timestamp.getMinutes()) +
-            makeTwo(timestamp.getSeconds());
+            absoluteFolder += postfix;
+        }
 
-        absoluteFolder += postfix;
+        console.log(`Starting capture process...`);
+        console.log(`Target folder: ${absoluteFolder}`);
+
+        const importerExporter = new ImporterExporter(
+            yargs.subscriptionId,
+            yargs.resourceGroupName,
+            yargs.serviceName,
+            yargs.tenantId,
+            yargs.servicePrincipal,
+            yargs.servicePrincipalSecret,
+            absoluteFolder
+        );
+
+        await importerExporter.export();
+
+        console.log(`✅ Content successfully captured in: ${absoluteFolder}`);
+    } catch (error) {
+        console.error(`❌ Capture failed: ${error.message}`);
+        if (error.details) {
+            console.error(`Details: ${error.details}`);
+        }
+        throw error;
     }
-
-    const importerExporter = new ImporterExporter(
-        yargs.subscriptionId,
-        yargs.resourceGroupName,
-        yargs.serviceName,
-        yargs.tenantId, 
-        yargs.servicePrincipal, 
-        yargs.servicePrincipalSecret,
-        absoluteFolder
-    );
-
-    await importerExporter.export();
-
-    console.log(`The content was captured in the ${absoluteFolder} folder.`);
 }
 
 function makeTwo(digits) {
-    const asString = digits.toString();
-
-    if (asString.length == 0) {
-        return "00";
-    }
-
-    if (asString.length == 1) {
-        return "0" + asString;
-    }
-
-    return asString.slice(-2);
+    return digits.toString().padStart(2, '0');
 }
 
 capture()
     .then(() => {
-        console.log("DONE");
+        console.log("✅ DONE");
         process.exit(0);
     })
     .catch(error => {
-        console.error(error.message);
+        console.error(`❌ ERROR: ${error.message}`);
         process.exit(1);
     });
 
-
 module.exports = {
     capture
-}
+};

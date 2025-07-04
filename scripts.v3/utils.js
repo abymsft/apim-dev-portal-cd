@@ -1,15 +1,19 @@
 const fs = require("fs");
 const path = require("path");
 const https = require("https");
-const { execSync } = require("child_process");
 const { BlobServiceClient } = require("@azure/storage-blob");
+const { 
+    DefaultAzureCredential, 
+    ClientSecretCredential,
+    ManagedIdentityCredential,
+    AzureCliCredential 
+} = require("@azure/identity");
 const blobStorageContainer = "content";
 const mime = require("mime");
-const apiVersion = "2021-08-01"; //"2020-06-01-preview";
+const apiVersion = "2021-08-01";
 const managementApiEndpoint = "management.azure.com";
 const metadataFileExt = ".info";
 const defaultFileEncoding = "utf8";
-
 
 class HttpClient {
     constructor(subscriptionId, resourceGroupName, serviceName, tenantId, servicePrincipal, secret) {
@@ -17,7 +21,46 @@ class HttpClient {
         this.resourceGroupName = resourceGroupName;
         this.serviceName = serviceName;
         this.baseUrl = `https://${managementApiEndpoint}/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.ApiManagement/service/${serviceName}`;
-        this.accessToken = this.getAccessToken(tenantId, servicePrincipal, secret);
+        
+        // Initialize Azure credential based on available parameters
+        this.credential = this.initializeCredential(tenantId, servicePrincipal, secret);
+        this.accessToken = null;
+    }
+
+    /**
+     * Initialize Azure credential based on available authentication parameters
+     */
+    initializeCredential(tenantId, servicePrincipal, secret) {
+        // If all service principal parameters are provided, use ClientSecretCredential
+        if (tenantId && servicePrincipal && secret) {
+            console.log("Using Service Principal authentication");
+            return new ClientSecretCredential(tenantId, servicePrincipal, secret);
+        }
+        
+        // If running in Azure (GitHub Actions with OIDC or Azure VM), try managed identity
+        if (process.env.GITHUB_ACTIONS && process.env.AZURE_CLIENT_ID) {
+            console.log("Using Managed Identity authentication for GitHub Actions");
+            return new ManagedIdentityCredential(process.env.AZURE_CLIENT_ID);
+        }
+
+        // Fallback to DefaultAzureCredential (tries multiple auth methods)
+        console.log("Using DefaultAzureCredential authentication");
+        return new DefaultAzureCredential({
+            // Exclude interactive browser credential in CI/CD environments
+            excludeInteractiveBrowserCredential: !!process.env.CI || !!process.env.GITHUB_ACTIONS
+        });
+    }
+
+    /**
+     * Get access token using Azure Identity
+     */
+    async getAccessToken() {
+        try {
+            const tokenResponse = await this.credential.getToken("https://management.azure.com/.default");
+            return `Bearer ${tokenResponse.token}`;
+        } catch (error) {
+            throw new Error(`Failed to get access token: ${error.message}`);
+        }
     }
 
     /**
@@ -39,6 +82,11 @@ class HttpClient {
 
         if (!requestUrl.searchParams.has("api-version")) {
             requestUrl.searchParams.append("api-version", apiVersion);
+        }
+
+        // Get fresh access token for each request
+        if (!this.accessToken) {
+            this.accessToken = await this.getAccessToken();
         }
 
         const headers = {
@@ -78,23 +126,46 @@ class HttpClient {
                         case 202:
                             data.startsWith("{") ? resolve(JSON.parse(data)) : resolve(data);
                             break;
-                        case 404:
-                            reject({ code: "NotFound", message: `Resource not found: ${requestUrl}` });
-                            break;
                         case 401:
-                            reject({ code: "Unauthorized", message: `Unauthorized. Make sure you're logged-in with "az login" command before running the script.` });
+                            // Token might be expired, clear it for next request
+                            this.accessToken = null;
+                            reject({ 
+                                code: "Unauthorized", 
+                                message: `Unauthorized. Please check your Azure credentials and permissions.`,
+                                details: data
+                            });
                             break;
                         case 403:
-                            reject({ code: "Forbidden", message: `Looks like you are not allowed to perform this operation. Please check with your administrator.` });
+                            reject({ 
+                                code: "Forbidden", 
+                                message: `Access denied. Please check your permissions for the API Management service.`,
+                                details: data
+                            });
+                            break;
+                        case 404:
+                            reject({ 
+                                code: "NotFound", 
+                                message: `Resource not found: ${requestUrl}`,
+                                details: data
+                            });
                             break;
                         default:
-                            reject({ code: "UnhandledError", message: `Could not complete request to ${requestUrl}. Status: ${resp.statusCode} ${resp.statusMessage}` });
+                            reject({ 
+                                code: "UnhandledError", 
+                                message: `Request failed: ${resp.statusCode} ${resp.statusMessage}`,
+                                url: requestUrl.toString(),
+                                details: data
+                            });
                     }
                 });
             });
 
             req.on('error', (e) => {
-                reject(e);
+                reject({
+                    code: "NetworkError",
+                    message: `Network error: ${e.message}`,
+                    originalError: e
+                });
             });
 
             if (requestBody) {
@@ -104,20 +175,12 @@ class HttpClient {
             req.end();
         });
     }
-
-    getAccessToken(tenantId, servicePrincipal, secret) {
-        if (tenantId != "" && tenantId != null) {
-            execSync(`az login --service-principal --username ` + servicePrincipal + ` --password ` + secret + ` --tenant ` + tenantId);
-        }
-
-        const accessToken = execSync(`az account get-access-token --resource-type arm --output tsv --query accessToken`).toString().trim();
-        return `Bearer ${accessToken}`;
-    }
 }
+
 class ImporterExporter {
     constructor(subscriptionId, resourceGroupName, serviceName, tenantId, servicePrincipal, secret, snapshotFolder = "../dist/snapshot") {
         this.httpClient = new HttpClient(subscriptionId, resourceGroupName, serviceName, tenantId, servicePrincipal, secret);
-        this.snapshotFolder = snapshotFolder
+        this.snapshotFolder = snapshotFolder;
     }
 
     /**
@@ -536,5 +599,6 @@ class ImporterExporter {
 }
 
 module.exports = {
-    ImporterExporter
+    ImporterExporter,
+    HttpClient
 };

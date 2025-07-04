@@ -8,15 +8,29 @@
         "azure"
     ],
     "engines": {
-        "node": ">=14.18.2"
+        "node": ">=18.0.0"
     },
     "scripts": {
     },
-    "devDependencies": {
-        "@azure/storage-blob": "12.13.0"
+    "dependencies": {
+        "@azure/identity": "^4.2.1",
+        "@azure/storage-blob": "^12.24.0",
+        "mime": "^4.0.4",
+        "yargs": "^17.7.2"
     },
-  "dependencies": {
-      "mime": "^3.0.0",
-      "yargs": "17.7.2"
-  }
+    "imports": {
+        "node:fs": "./node_modules/fs-extra/lib/index.js",
+        "node:path": "./node_modules/path-browserify/index.js",
+        "node:stream": "./node_modules/stream-browserify/index.js",
+        "node:url": "./node_modules/url/url.js",
+        "node:util": "./node_modules/util/util.js"
+    },
+    "devDependencies": {
+        "@types/node": "^18.11.18",
+        "fs-extra": "^10.0.0",
+        "path-browserify": "^1.0.1",
+        "stream-browserify": "^3.2.0",
+        "url": "^0.11.0",
+        "util": "^0.12.5"
+    }
 }
