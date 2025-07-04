@@ -26,16 +26,19 @@ const yargs = require('yargs')
     .option('subscriptionId', {
         type: 'string',
         description: 'Azure subscription ID.',
+        default: process.env.AZURE_SUBSCRIPTION_ID,
         demandOption: true
     })
     .option('resourceGroupName', {
         type: 'string',
         description: 'Azure resource group name.',
+        default: process.env.AZURE_RESOURCE_GROUP_NAME,
         demandOption: true
     })
     .option('serviceName', {
         type: 'string',
         description: 'API Management service name.',
+        default: process.env.AZURE_SERVICE_NAME,
         demandOption: true
     })
     .option('folder', {
@@ -53,16 +56,19 @@ const yargs = require('yargs')
     .option('tenantId', {
         type: 'string',
         description: 'tenant ID.',
+        default: process.env.AZURE_TENANT_ID,
         demandOption: false
     })
     .option('servicePrincipal', {
         type: 'string',
         description: 'service principal ID.',
+        default: process.env.AZURE_CLIENT_ID,
         demandOption: false
     })
     .option('servicePrincipalSecret', {
         type: 'string',
         description: 'service principal secret.',
+        default: process.env.AZURE_CLIENT_SECRET,
         demandOption: false
     })
     .help()
