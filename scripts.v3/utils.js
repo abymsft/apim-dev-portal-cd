@@ -8,13 +8,22 @@ const {
     ManagedIdentityCredential,
     AzureCliCredential 
 } = require("@azure/identity");
+
 const blobStorageContainer = "content";
-const mime = require("mime");
+
 const apiVersion = "2021-08-01";
 const managementApiEndpoint = "management.azure.com";
 const metadataFileExt = ".info";
 const defaultFileEncoding = "utf8";
 
+// Add a helper function to load mime dynamically
+let mime;
+async function getMime() {
+    if (!mime) {
+        mime = await import('mime');
+    }
+    return mime;
+}
 class HttpClient {
     constructor(subscriptionId, resourceGroupName, serviceName, tenantId, servicePrincipal, secret) {
         this.subscriptionId = subscriptionId;
@@ -342,6 +351,9 @@ class ImporterExporter {
             const blobServiceClient = new BlobServiceClient(blobStorageUrl.replace(`/${blobStorageContainer}`, ""));
             const containerClient = blobServiceClient.getContainerClient(blobStorageContainer);
             const fileNames = this.listFilesInDirectory(snapshotMediaFolder);
+            
+            // Get mime dynamically
+            const mimeModule = await getMime();
 
             for (const fileName of fileNames) {
                 let contentType;
@@ -354,7 +366,7 @@ class ImporterExporter {
                     contentType = metadata.contentType
                 } else {
                     blobKey = blobKey.split(".")[0];
-                    contentType = mime.getType(fileName) || "application/octet-stream";
+                    contentType = mimeModule.getType(fileName) || "application/octet-stream";
                 }
 
                 const blockBlobClient = containerClient.getBlockBlobClient(blobKey);
