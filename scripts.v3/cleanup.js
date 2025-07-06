@@ -28,55 +28,94 @@ const yargs = require('yargs')
     .option('subscriptionId', {
         type: 'string',
         description: 'Azure subscription ID.',
-        example: '<bla bla>',
-        demandOption: true
+        default: process.env.AZURE_SUBSCRIPTION_ID,
+        demandOption: !process.env.AZURE_SUBSCRIPTION_ID
     })
     .option('resourceGroupName', {
         type: 'string',
-        description: 'Azure resource group name.'
+        description: 'Azure resource group name.',
+        default: process.env.AZURE_RESOURCE_GROUP_NAME,
+        demandOption: !process.env.AZURE_RESOURCE_GROUP_NAME
     })
     .option('serviceName', {
         type: 'string',
         description: 'API Management service name.',
+        default: process.env.AZURE_SERVICE_NAME,
+        demandOption: !process.env.AZURE_SERVICE_NAME
     })
     .option('tenantId', {
         type: 'string',
         description: 'tenant ID.',
-        demandOption: false
+        default: process.env.AZURE_TENANT_ID,
+        demandOption: !process.env.AZURE_TENANT_ID
     })
     .option('servicePrincipal', {
         type: 'string',
-        description: 'service principal ID.',
+        description: 'Service principal client ID (optional, can use AZURE_CLIENT_ID env var)',
+        default: process.env.AZURE_CLIENT_ID,
         demandOption: false
     })
     .option('servicePrincipalSecret', {
         type: 'string',
-        description: 'service principal secret.',
+        description: 'Service principal secret (optional, can use AZURE_CLIENT_SECRET env var)',
+        default: process.env.AZURE_CLIENT_SECRET,
         demandOption: false
     })    
     .help()
     .argv;
 
 async function cleanup() {
-    const importerExporter = new ImporterExporter(
-        yargs.subscriptionId,
-        yargs.resourceGroupName,
-        yargs.serviceName,
-        yargs.tenantId, 
-        yargs.servicePrincipal, 
-        yargs.servicePrincipalSecret,
-    );
+    try {
+        // Validate required parameters
+        if (!yargs.subscriptionId || !yargs.resourceGroupName || !yargs.serviceName) {
+            throw new Error('Missing required parameters: subscriptionId, resourceGroupName, and serviceName are required');
+        }
 
-    await importerExporter.cleanup();
+        // Safety confirmation
+        if (!yargs.confirm) {
+            console.warn('⚠️  WARNING: This will DELETE ALL content from the API Management developer portal!');
+            console.warn(`   Service: ${yargs.serviceName}`);
+            console.warn(`   Resource Group: ${yargs.resourceGroupName}`);
+            console.warn(`   Subscription: ${yargs.subscriptionId}`);
+            console.warn('');
+            console.warn('   To proceed, add the --confirm flag to your command.');
+            console.warn('   Example: node ./cleanup --subscriptionId "..." --resourceGroupName "..." --serviceName "..." --confirm');
+            return;
+        }
+
+        console.log('🧹 Starting cleanup process...');
+        console.log(`   Target Service: ${yargs.serviceName}`);
+        console.log(`   Resource Group: ${yargs.resourceGroupName}`);
+
+        const importerExporter = new ImporterExporter(
+            yargs.subscriptionId,
+            yargs.resourceGroupName,
+            yargs.serviceName,
+            yargs.tenantId,
+            yargs.servicePrincipal,
+            yargs.servicePrincipalSecret
+        );
+
+        await importerExporter.cleanup();
+        
+        console.log('✅ Cleanup completed successfully!');
+        
+    } catch (error) {
+        console.error(`❌ Cleanup failed: ${error.message}`);
+        if (error.details) {
+            console.error(`Details: ${error.details}`);
+        }
+        throw error;
+    }
 }
 
 cleanup()
     .then(() => {
-        console.log("DONE");
+        console.log("✅ DONE");
         process.exit(0);
     })
     .catch(error => {
-        console.error(error.message);
+        console.error(`❌ ERROR: ${error.message}`);
         process.exit(1);
     });
 

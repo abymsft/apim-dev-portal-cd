@@ -24,49 +24,56 @@
  * 
  * You can specify the SAS tokens directly (via sourceToken and destToken), or you can supply an identifier and key,
  * and the script will generate tokens that expire in 1 hour. (via sourceId, sourceKey, destId, destKey)
- */
+ 
+    *    --destTenantId "< optional (needed if source and destination is in different subscription) destination tenant ID > \r
+    *    --destServicePrincipal "< optional (needed if source and destination is in different subscription) destination servicePrincipal or user name. > \r
+    *    --destSecret "< optional (needed if source and destination is in different subscription) secret or password for service principal or az login for the destination. >\r 
+    *    --existingEnvUrls "< optional (urls used in the developer portal from source apim to replace - if we have multiple urls then comma separated values to be given.) > \r
+    *    --destEnvUrls "< optional (urls to be replaced in the developer portal in destination apim in same order - if we have multiple urls then comma separated values to be given.) > \n`
+*/
 
 const { ImporterExporter } = require('./utils.js');
 
 const yargs = require('yargs')
     .example(`node ./updatecontenturl ^ \r
-    *    --destSubscriptionId "< your subscription ID > \r
-    *    --destResourceGroupName "< your resource group name > \r
-    *    --destServiceName "< your service name > \r
-    *    --destTenantId "< optional (needed if source and destination is in different subscription) destination tenant ID > \r
-    *    --destServicePrincipal "< optional (needed if source and destination is in different subscription) destination servicePrincipal or user name. > \r
-    *    --destSecret "< optional (needed if source and destination is in different subscription) secret or password for service principal or az login for the destination. >\r 
-    *    --existingEnvUrls "< optional (urls used in the developer portal from source apim to replace - if we have multiple urls then comma separated values to be given.) > \r
-    *    --destEnvUrls "< optional (urls to be replaced in the developer portal in destination apim in same order - if we have multiple urls then comma separated values to be given.) > \n`)
+        --destSubscriptionId "< your subscription ID > \r
+        --destResourceGroupName "< your resource group name > \r
+        --destServiceName "< your service name > \r
+     \n`)
     
     .option('destSubscriptionId', {
         type: 'string',
         description: 'Azure subscription ID.',
-        demandOption: true
+        default: process.env.AZURE_SUBSCRIPTION_ID,
+        demandOption: !process.env.AZURE_SUBSCRIPTION_ID
     })
     .option('destResourceGroupName', {
         type: 'string',
         description: 'Azure resource group name.',
-        demandOption: true
+        default: process.env.AZURE_RESOURCE_GROUP_NAME,
+        demandOption: !process.env.AZURE_RESOURCE_GROUP_NAME
     })
     .option('destServiceName', {
         type: 'string',
         description: 'API Management service name.',
-        demandOption: true
+        default: process.env.AZURE_SERVICE_NAME,
+        demandOption: !process.env.AZURE_SERVICE_NAME
     })
     .option('destTenantId', {
         type: 'string',
         description: ' destination tenant ID.',
-        demandOption: false
+        default: process.env.AZURE_TENANT_ID
     })
     .option('destServicePrincipal', {
         type: 'string',
         description: 'destination servicePrincipal or user name.',
+        default: process.env.AZURE_CLIENT_ID,
         demandOption: false
     })
     .option('destSecret', {
         type: 'string',
         description: 'secret or password for service principal or az login for the destination.',
+        default: process.env.AZURE_CLIENT_SECRET,
         demandOption: false
     })
     .option('existingEnvUrls', {

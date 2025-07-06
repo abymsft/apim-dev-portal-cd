@@ -5,39 +5,41 @@
  * 1) Clone the api-management-developer-portal repository:
  *    git clone https://github.com/Azure/api-management-developer-portal.git
  * 
- * 2) Install NPM  packages:
+ * 2) Install NPM packages:
  *    npm install
  * 
- * 3) Run this script with a valid combination of arguments:
- *    node ./generate ^
- *   --subscriptionId < your subscription ID > ^
- *   --resourceGroupName < your resource group name > ^
- *   --serviceName < your service name > ^
- *   --publish true [false: default]
+ * 3) Set up authentication using one of these methods:
+ *    - Service Principal: Set AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+ *    - Managed Identity: Set AZURE_CLIENT_ID (in Azure environments)
+ *    - Azure CLI: Run 'az login' (fallback option)
+ * 
+ * 4) Run this script:
+ *    node ./generate --subscriptionId <id> --resourceGroupName <name> --serviceName <name> --folder <path>
  */
 
 const path = require("path");
+const fs = require("fs");
 const { ImporterExporter } = require("./utils");
 
 const yargs = require('yargs')
-    .example(`node ./generate ^ \r
-     --subscriptionId "< your subscription ID >" ^ \r
-     --resourceGroupName "< your resource group name >" ^ \r
-     --serviceName "< your service name >"\n`)
+    .example(`node ./generate --subscriptionId "<subscription-id>" --resourceGroupName "<resource-group>" --serviceName "<service-name>" --folder "./dist/snapshot"`)
     .option('subscriptionId', {
         type: 'string',
         description: 'Azure subscription ID.',
-        demandOption: true
+        default: process.env.AZURE_SUBSCRIPTION_ID,
+        demandOption: !process.env.AZURE_SUBSCRIPTION_ID
     })
     .option('resourceGroupName', {
         type: 'string',
         description: 'Azure resource group name.',
-        demandOption: true
+        default: process.env.AZURE_RESOURCE_GROUP_NAME,
+        demandOption: !process.env.AZURE_RESOURCE_GROUP_NAME
     })
     .option('serviceName', {
         type: 'string',
         description: 'API Management service name.',
-        demandOption: true
+        default: process.env.AZURE_SERVICE_NAME,
+        demandOption: !process.env.AZURE_SERVICE_NAME
     })
     .option('folder', {
         type: 'string',
@@ -54,62 +56,113 @@ const yargs = require('yargs')
     })
     .option('tenantId', {
         type: 'string',
-        description: 'tenant ID.',
+        description: 'Azure tenant ID (optional, can use AZURE_TENANT_ID env var)',
+        default: process.env.AZURE_TENANT_ID,
         demandOption: false
     })
     .option('servicePrincipal', {
         type: 'string',
-        description: 'service principal ID.',
+        description: 'Service principal client ID (optional, can use AZURE_CLIENT_ID env var)',
+        default: process.env.AZURE_CLIENT_ID,
         demandOption: false
     })
     .option('servicePrincipalSecret', {
         type: 'string',
-        description: 'service principal secret.',
+        description: 'Service principal secret (optional, can use AZURE_CLIENT_SECRET env var)',
+        default: process.env.AZURE_CLIENT_SECRET,
+        demandOption: false
+    })
+    .option('force', {
+        type: 'boolean',
+        default: false,
+        description: 'Force generation even if snapshot validation fails',
         demandOption: false
     })
     .help()
     .argv;
 
 async function generate() {
+    try {
+        // Validate required parameters
+        if (!yargs.subscriptionId || !yargs.resourceGroupName || !yargs.serviceName) {
+            throw new Error('Missing required parameters: subscriptionId, resourceGroupName, and serviceName are required');
+        }
 
-    // make the folder path understandable if running in Windows
-    const folder = yargs.folder.split("\\").join("/");
+        // Use proper cross-platform path handling
+        const absoluteFolder = path.resolve(yargs.folder);
+        
+        console.log('📦 Starting generate process...');
+        console.log(`   Source folder: ${absoluteFolder}`);
+        console.log(`   Target Service: ${yargs.serviceName}`);
+        console.log(`   Resource Group: ${yargs.resourceGroupName}`);
+        console.log(`   Publish after import: ${yargs.publish ? 'Yes' : 'No'}`);
 
-    // get the absolute path
-    var absoluteFolder = path.resolve(folder);
-    console.log(`Going to upload the content in ${absoluteFolder}.`);
+        // Validate snapshot folder exists
+        if (!fs.existsSync(absoluteFolder)) {
+            throw new Error(`Snapshot folder not found: ${absoluteFolder}`);
+        }
 
-    const importerExporter = new ImporterExporter(
-        yargs.subscriptionId,
-        yargs.resourceGroupName,
-        yargs.serviceName,
-        yargs.tenantId, 
-        yargs.servicePrincipal, 
-        yargs.servicePrincipalSecret,
-        absoluteFolder
-    );
+        // Validate snapshot contains data
+        const dataFile = path.join(absoluteFolder, 'data.json');
+        if (!fs.existsSync(dataFile)) {
+            if (!yargs.force) {
+                throw new Error(`Snapshot data file not found: ${dataFile}. Use --force to override.`);
+            } else {
+                console.warn('⚠️  Warning: data.json not found, proceeding due to --force flag');
+            }
+        }
 
-    await importerExporter.import();
+        // Check if snapshot has content
+        const files = fs.readdirSync(absoluteFolder);
+        if (files.length === 0) {
+            throw new Error(`Snapshot folder is empty: ${absoluteFolder}`);
+        }
 
-    if (yargs.publish === true) {
-        console.log("Publishing changes...");
-        await importerExporter.publish();
-        console.log("Published.");
-    } else {
-        console.warn("Skipped publishing changes! If you want to publish the changes run the script with --publish true flag.");    
+        console.log(`✅ Snapshot validation passed. Found ${files.length} items.`);
+
+        const importerExporter = new ImporterExporter(
+            yargs.subscriptionId,
+            yargs.resourceGroupName,
+            yargs.serviceName,
+            yargs.tenantId,
+            yargs.servicePrincipal,
+            yargs.servicePrincipalSecret,
+            absoluteFolder
+        );
+
+        console.log('🔄 Importing content...');
+        await importerExporter.import();
+        console.log('✅ Content imported successfully!');
+
+        if (yargs.publish === true) {
+            console.log('📢 Publishing changes...');
+            await importerExporter.publish();
+            console.log('✅ Changes published successfully!');
+        } else {
+            console.log('ℹ️  Skipped publishing changes.');
+            console.log('   💡 To publish changes, run the script with --publish flag.');
+        }
+
+        console.log('✅ Generate process completed successfully!');
+
+    } catch (error) {
+        console.error(`❌ Generate failed: ${error.message}`);
+        if (error.details) {
+            console.error(`Details: ${error.details}`);
+        }
+        throw error;
     }
 }
 
 generate()
     .then(() => {
-        console.log("DONE");
+        console.log("✅ DONE");
         process.exit(0);
     })
     .catch(error => {
-        console.error(error.message);
+        console.error(`❌ ERROR: ${error.message}`);
         process.exit(1);
     });
-
 
 module.exports = {
     generate
