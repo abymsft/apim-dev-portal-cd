@@ -91,7 +91,7 @@ jobs:
           path: "${{ github.workspace }}/${{ env.OUTPUT_FOLDER_PATH }}"
 
       - name: Create artifacts pull request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         env:  
           OUTPUT_FOLDER_PATH: ${{ github.event.inputs.OUTPUT_FOLDER_PATH }}      
         with:
