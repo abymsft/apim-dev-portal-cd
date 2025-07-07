@@ -75,8 +75,11 @@ async function capture() {
             throw new Error('Missing required parameters: subscriptionId, resourceGroupName, and serviceName are required');
         }
 
+        // make the folder path understandable if running in Windows
+        const folder = yargs.folder.split("\\").join("/");
+
         // Use path.resolve for proper cross-platform path handling
-        let absoluteFolder = path.resolve(yargs.folder);
+        let absoluteFolder = path.resolve(folder);
 
         // Add timestamp if requested
         if (yargs.timestamp) {

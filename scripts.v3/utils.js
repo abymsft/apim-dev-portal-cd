@@ -15,7 +15,17 @@ const apiVersion = "2021-08-01";
 const managementApiEndpoint = "management.azure.com";
 const metadataFileExt = ".info";
 const defaultFileEncoding = "utf8";
-
+/**
+ * Utility function to check if a value is empty or null
+ * @param {any} value - The value to check
+ * @returns {boolean} - True if value is null, undefined, empty string, or whitespace only
+ */
+function isEmpty(value) {
+    return value === null || 
+           value === undefined || 
+           (typeof value === 'string' && value.trim() === '') ||
+           (Array.isArray(value) && value.length === 0);
+}
 // Add a helper function to load mime dynamically
 let mime;
 async function getMime() {
@@ -223,8 +233,22 @@ class ImporterExporter {
      */
     async getContentTypes() {
         try {
+            debugger;
             const data = await this.httpClient.sendRequest("GET", `/contentTypes`);
-            const contentTypes = data.value.map(x => x.id.replace("\/contentTypes\/", ""));
+            
+            // Check if response data is empty or invalid
+            if (!data || isEmpty(data.value) || !Array.isArray(data.value)) {
+                console.warn('No content types found or invalid response format');
+                return [];
+            }
+
+            const contentTypes = data.value
+                .filter(x => x && x.id && !isEmpty(x.id)) // Filter out empty entries
+                .map(x => x.id.replace("\/contentTypes\/", ""));
+
+            if (contentTypes.length === 0) {
+                console.warn('No valid content types found after filtering');
+            }
 
             return contentTypes;
         }

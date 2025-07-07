@@ -21,13 +21,13 @@ jobs:
           USER_INPUT_OUTPUT_FOLDER_PATH=${{ inputs.OUTPUT_FOLDER_PATH }}
           echo "output_path=${USER_INPUT_OUTPUT_FOLDER_PATH:-"artifacts"}" >> "$GITHUB_ENV"
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: 18  
+          node-version: 20
 
       - name: Run Cleanup
         env:
