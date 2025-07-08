@@ -83,6 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       OUTPUT_FOLDER_PATH: ${{ needs.capture.outputs.output-folder-path }}
+      TARGET_FOLDER: "APIM"  # Fixed target folder for PR
     steps:
       - uses: actions/checkout@v4
           
@@ -90,60 +91,103 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: artifacts-from-capture
-          path: "${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}"
+          path: "temp-artifacts"  # Download to temp location first
 
-      - name: Verify downloaded artifacts
+      - name: Extract and organize artifacts
         run: |
-          echo "Verifying downloaded artifacts..."
-          echo "Looking in: ${{ env.OUTPUT_FOLDER_PATH }}"
-          echo "Full path: ${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}"
+          echo "Extracting and organizing captured artifacts..."
+          echo "Downloaded from capture folder: ${{ env.OUTPUT_FOLDER_PATH }}"
+          echo "Publishing to target folder: ${{ env.TARGET_FOLDER }}"
           
-          if [ ! -d "${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}" ]; then
-            echo "Error: Downloaded artifacts directory not found: ${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}"
+          # Create target directory
+          mkdir -p "${{ env.TARGET_FOLDER }}"
+          
+          # Find the main JSON file (data.json) from the snapshot
+          if [ -f "temp-artifacts/snapshot/data.json" ]; then
+            echo "Found main data.json file"
+            cp "temp-artifacts/snapshot/data.json" "${{ env.TARGET_FOLDER }}/data.json"
+            echo "✅ Copied data.json to ${{ env.TARGET_FOLDER }}/data.json"
+          else
+            echo "❌ data.json not found in expected location"
+            echo "Contents of temp-artifacts:"
+            find temp-artifacts -type f
             exit 1
           fi
           
-          echo "Contents of ${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}:"
-          find "${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}" -type f | head -20
+          # Copy any media files if they exist
+          if [ -d "temp-artifacts/snapshot/media" ]; then
+            echo "Found media files, copying..."
+            cp -r "temp-artifacts/snapshot/media" "${{ env.TARGET_FOLDER }}/media"
+            echo "✅ Copied media files to ${{ env.TARGET_FOLDER }}/media"
+          fi
           
-          file_count=$(find "${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}" -type f | wc -l)
-          echo "Total files downloaded: $file_count"
+          # Clean up temp directory
+          rm -rf temp-artifacts
           
-          if [ "$file_count" -eq 0 ]; then
-            echo "Error: No files found in downloaded artifacts"
+          echo "Final structure in ${{ env.TARGET_FOLDER }}:"
+          find "${{ env.TARGET_FOLDER }}" -type f
+        shell: bash
+
+      - name: Verify extracted JSON file
+        run: |
+          echo "Verifying extracted JSON file..."
+          
+          if [ ! -f "${{ env.TARGET_FOLDER }}/data.json" ]; then
+            echo "❌ Error: data.json not found in ${{ env.TARGET_FOLDER }}"
             exit 1
           fi
+          
+          # Validate JSON format
+          if ! jq empty "${{ env.TARGET_FOLDER }}/data.json" 2>/dev/null; then
+            echo "❌ Error: data.json is not valid JSON"
+            exit 1
+          fi
+          
+          # Show file info
+          file_size=$(stat -c%s "${{ env.TARGET_FOLDER }}/data.json")
+          echo "✅ data.json is valid JSON"
+          echo "📊 File size: $file_size bytes"
+          echo "🔢 Number of keys: $(jq 'keys | length' "${{ env.TARGET_FOLDER }}/data.json")"
+          
+          # Show first few keys for verification
+          echo "📋 Sample keys:"
+          jq -r 'keys | .[0:5] | .[]' "${{ env.TARGET_FOLDER }}/data.json" | head -5
         shell: bash
 
       - name: Create artifacts pull request
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update developer portal capture to ${{ env.OUTPUT_FOLDER_PATH }}"
-          title: "🔄 ${{ env.OUTPUT_FOLDER_PATH }} - Dev Portal Capture Update"
+          commit-message: "chore: update APIM developer portal data.json"
+          title: "🔄 APIM - Developer Portal Data Update"
           body: |
-            ## Developer Portal Capture Update
+            ## Developer Portal Content Update
             
-            This PR contains captured artifacts from the APIM developer portal.
+            This PR contains the latest captured content from the APIM developer portal.
             
             **Details:**
-            - **Folder:** `${{ env.OUTPUT_FOLDER_PATH }}`
-            - **Environment:** development
-            - **Timestamp:** ${{ github.run_id }}
+            - **Main File:** `${{ env.TARGET_FOLDER }}/data.json`
+            - **Source Environment:** development
+            - **Capture Timestamp:** ${{ github.run_id }}
             - **Triggered by:** @${{ github.actor }}
             
+            **Changes:**
+            - Updated `${{ env.TARGET_FOLDER }}/data.json` with latest portal content
+            - Includes all content types, pages, layouts, and configurations
+            
             **Next Steps:**
-            1. Review the captured artifacts
+            1. Review the JSON changes in `${{ env.TARGET_FOLDER }}/data.json`
             2. Merge this PR to trigger the release workflow
             3. Monitor the deployment to target environments
             
             ---
             *This PR was auto-generated by the GitHub Actions workflow*
-          labels: extract, automated-pr
-          branch: feature/dev-portal-capture-${{ github.run_id }}
+          labels: apim-content, automated-pr
+          branch: feature/apim-content-update-${{ github.run_id }}
           delete-branch: true
           add-paths: |
-            ${{ env.OUTPUT_FOLDER_PATH }}/*
+            ${{ env.TARGET_FOLDER }}/data.json
+            ${{ env.TARGET_FOLDER }}/media/**
         id: create-pr
         
       - name: Display PR information
@@ -153,4 +197,5 @@ jobs:
           echo "📋 PR Number: ${{ steps.create-pr.outputs.pull-request-number }}"
           echo "🔗 PR URL: ${{ steps.create-pr.outputs.pull-request-url }}"
           echo "🌿 Branch: ${{ steps.create-pr.outputs.pull-request-head-sha }}"
+          echo "📁 Main file: ${{ env.TARGET_FOLDER }}/data.json"
         shell: bash

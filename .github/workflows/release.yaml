@@ -9,23 +9,23 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
     inputs:
-      OUTPUT_FOLDER_PATH:
-        description: 'Folder where you want to publish the artifacts from'
+      SOURCE_FOLDER_PATH:
+        description: 'Folder where the captured artifacts are stored'
         required: true
         type: string
-        default: 'artifacts'
+        default: 'APIM'
 
 jobs:
   release-dev:
     uses: ./.github/workflows/release-with-env.yaml
     with:
       ENVIRONMENT: development
-      OUTPUT_FOLDER_PATH: ${{ github.event.inputs.OUTPUT_FOLDER_PATH }}
+      SOURCE_FOLDER_PATH: ${{ github.event.inputs.SOURCE_FOLDER_PATH || 'APIM' }}
     secrets: inherit
   release-stage:
     needs: release-dev
     uses: ./.github/workflows/release-with-env.yaml
     with:
       ENVIRONMENT: Test
-      OUTPUT_FOLDER_PATH: ${{ github.event.inputs.OUTPUT_FOLDER_PATH }}
+      SOURCE_FOLDER_PATH: ${{ github.event.inputs.SOURCE_FOLDER_PATH || 'APIM' }}
     secrets: inherit
