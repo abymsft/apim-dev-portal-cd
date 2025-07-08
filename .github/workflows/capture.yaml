@@ -81,13 +81,13 @@ jobs:
   create-pull-request:
     needs: capture
     runs-on: ubuntu-latest
+    env:
+      OUTPUT_FOLDER_PATH: ${{ needs.capture.outputs.output-folder-path }}
     steps:
       - uses: actions/checkout@v4
           
       - name: Download Capture artifacts
         uses: actions/download-artifact@v4
-        env:
-          OUTPUT_FOLDER_PATH: ${{ github.event.inputs.OUTPUT_FOLDER_PATH }}  
         with:
           name: artifacts-from-capture
           path: "${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}"
@@ -96,16 +96,17 @@ jobs:
         run: |
           echo "Verifying downloaded artifacts..."
           echo "Looking in: ${{ env.OUTPUT_FOLDER_PATH }}"
+          echo "Full path: ${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}"
           
-          if [ ! -d "${{ env.OUTPUT_FOLDER_PATH }}" ]; then
-            echo "Error: Downloaded artifacts directory not found: ${{ env.OUTPUT_FOLDER_PATH }}"
+          if [ ! -d "${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}" ]; then
+            echo "Error: Downloaded artifacts directory not found: ${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}"
             exit 1
           fi
           
-          echo "Contents of ${{ env.OUTPUT_FOLDER_PATH }}:"
-          find "${{ env.OUTPUT_FOLDER_PATH }}" -type f | head -20
+          echo "Contents of ${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}:"
+          find "${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}" -type f | head -20
           
-          file_count=$(find "${{ env.OUTPUT_FOLDER_PATH }}" -type f | wc -l)
+          file_count=$(find "${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}" -type f | wc -l)
           echo "Total files downloaded: $file_count"
           
           if [ "$file_count" -eq 0 ]; then
@@ -116,8 +117,6 @@ jobs:
 
       - name: Create artifacts pull request
         uses: peter-evans/create-pull-request@v7
-        env:  
-         OUTPUT_FOLDER_PATH: ${{ github.event.inputs.OUTPUT_FOLDER_PATH }}  
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: update developer portal capture to ${{ env.OUTPUT_FOLDER_PATH }}"
