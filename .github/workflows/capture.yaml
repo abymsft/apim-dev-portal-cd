@@ -186,8 +186,7 @@ jobs:
           branch: feature/apim-content-update-${{ github.run_id }}
           delete-branch: true
           add-paths: |
-            ${{ env.TARGET_FOLDER }}/data.json
-            ${{ env.TARGET_FOLDER }}/media/**
+             ${{ env.TARGET_FOLDER }}/*
         id: create-pr
         
       - name: Display PR information
