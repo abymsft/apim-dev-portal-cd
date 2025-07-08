@@ -19,6 +19,8 @@ jobs:
   capture:
     runs-on: ubuntu-latest
     environment: development # change this to match the dev environment created in settings 
+    outputs:
+      output-folder-path: ${{ github.event.inputs.OUTPUT_FOLDER_PATH }}
     steps:
       - uses: actions/checkout@v4  
       - uses: actions/setup-node@v4
@@ -79,26 +81,46 @@ jobs:
   create-pull-request:
     needs: capture
     runs-on: ubuntu-latest
+    env:
+      OUTPUT_FOLDER_PATH: ${{ needs.capture.outputs.output-folder-path }}
     steps:
       - uses: actions/checkout@v4
           
       - name: Download Capture artifacts
         uses: actions/download-artifact@v4
-        env:
-          OUTPUT_FOLDER_PATH: ${{ github.event.inputs.OUTPUT_FOLDER_PATH }}  
         with:
           name: artifacts-from-capture
-          path: "${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}"
+          path: ${{ env.OUTPUT_FOLDER_PATH }}
+
+      - name: Verify downloaded artifacts
+        run: |
+          echo "Verifying downloaded artifacts..."
+          echo "Looking in: ${{ env.OUTPUT_FOLDER_PATH }}"
+          
+          if [ ! -d "${{ env.OUTPUT_FOLDER_PATH }}" ]; then
+            echo "Error: Downloaded artifacts directory not found: ${{ env.OUTPUT_FOLDER_PATH }}"
+            exit 1
+          fi
+          
+          echo "Contents of ${{ env.OUTPUT_FOLDER_PATH }}:"
+          find "${{ env.OUTPUT_FOLDER_PATH }}" -type f | head -20
+          
+          file_count=$(find "${{ env.OUTPUT_FOLDER_PATH }}" -type f | wc -l)
+          echo "Total files downloaded: $file_count"
+          
+          if [ "$file_count" -eq 0 ]; then
+            echo "Error: No files found in downloaded artifacts"
+            exit 1
+          fi
+        shell: bash
 
       - name: Create artifacts pull request
         uses: peter-evans/create-pull-request@v7
-        env:  
-          OUTPUT_FOLDER_PATH: ${{ github.event.inputs.OUTPUT_FOLDER_PATH }}      
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: update developer portal capture to ${{ env.OUTPUT_FOLDER_PATH }}"
           title: "🔄 ${{ env.OUTPUT_FOLDER_PATH }} - Dev Portal Capture Update"
-          body: >
+          body: |
             ## Developer Portal Capture Update
             
             This PR contains captured artifacts from the APIM developer portal.
@@ -119,13 +141,15 @@ jobs:
           labels: extract, automated-pr
           branch: feature/dev-portal-capture-${{ github.run_id }}
           delete-branch: true
+          add-paths: |
+            ${{ env.OUTPUT_FOLDER_PATH }}/*
         id: create-pr
         
       - name: Display PR information
         if: steps.create-pr.outputs.pull-request-number
         run: |
-          Write-Host "✅ Pull Request created successfully!"
-          Write-Host "📋 PR Number: ${{ steps.create-pr.outputs.pull-request-number }}"
-          Write-Host "🔗 PR URL: ${{ steps.create-pr.outputs.pull-request-url }}"
-          Write-Host "🌿 Branch: ${{ steps.create-pr.outputs.pull-request-head-sha }}"
-        shell: pwsh
+          echo "✅ Pull Request created successfully!"
+          echo "📋 PR Number: ${{ steps.create-pr.outputs.pull-request-number }}"
+          echo "🔗 PR URL: ${{ steps.create-pr.outputs.pull-request-url }}"
+          echo "🌿 Branch: ${{ steps.create-pr.outputs.pull-request-head-sha }}"
+        shell: bash
