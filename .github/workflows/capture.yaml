@@ -81,16 +81,16 @@ jobs:
   create-pull-request:
     needs: capture
     runs-on: ubuntu-latest
-    env:
-      OUTPUT_FOLDER_PATH: ${{ needs.capture.outputs.output-folder-path }}
     steps:
       - uses: actions/checkout@v4
           
       - name: Download Capture artifacts
         uses: actions/download-artifact@v4
+        env:
+          OUTPUT_FOLDER_PATH: ${{ github.event.inputs.OUTPUT_FOLDER_PATH }}  
         with:
           name: artifacts-from-capture
-          path: ${{ env.OUTPUT_FOLDER_PATH }}
+          path: "${{ GITHUB.WORKSPACE }}/${{ env.OUTPUT_FOLDER_PATH }}"
 
       - name: Verify downloaded artifacts
         run: |
@@ -116,6 +116,8 @@ jobs:
 
       - name: Create artifacts pull request
         uses: peter-evans/create-pull-request@v7
+        env:  
+         OUTPUT_FOLDER_PATH: ${{ github.event.inputs.OUTPUT_FOLDER_PATH }}  
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: update developer portal capture to ${{ env.OUTPUT_FOLDER_PATH }}"
