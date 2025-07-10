@@ -6,19 +6,19 @@
       "value": "apimDev003TDC"
     },
     "resourceGroupName": {
-      "value": "rg-apim-dev-003"
+      "value": "APIAggregator"
     },
     "location": {
-      "value": "East US"
+      "value": "swedencentral"
     },
     "sku": {
-      "value": "Developer"
+      "value": "developer"
     },
     "skuCount": {
       "value": 1
     },
     "publisherEmail": {
-      "value": "admin@contoso.com"
+      "value": "abishek.narayan@contoso.com"
     },
     "publisherName": {
       "value": "Contoso Administrator"

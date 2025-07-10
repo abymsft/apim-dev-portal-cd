@@ -19,30 +19,30 @@ on:
       resourceGroupName:
         description: 'Resource Group Name'
         required: true
-        default: 'rg-apim-dev-003'
+        default: ${{ secrets.RESOURCE_GROUP_NAME }}
         type: string
+
       location:
         description: 'Azure Region'
         required: true
-        default: 'East US'
-        type: choice
-        options:
-          - 'East US'
-          - 'West US 2'
-          - 'Central US'
-          - 'North Europe'
-          - 'West Europe'
+        default: 'swedencentral'
+        type: string
       sku:
         description: 'APIM SKU'
         required: true
-        default: 'Developer'
-        type: choice
-        options:
-          - 'Consumption'
-          - 'Developer'
-          - 'Basic'
-          - 'Standard'
-          - 'Premium'
+        default: 'BasicV2'
+        type: string
+      APIM_PUBLISHER_EMAIL:
+        description: 'APIM Publisher Email'
+        required: true
+        default: 'boing@boing.com'
+        type: string
+
+      APIM_PUBLISHER_NAME:
+        description: 'APIM Publisher Name'
+        required: true
+        default: 'Boing Boing'
+        type: string
 
 permissions:
   id-token: write
@@ -50,10 +50,15 @@ permissions:
   pull-requests: write
 
 env:
-  AZURE_RESOURCE_GROUP: ${{ github.event.inputs.resourceGroupName }}
   AZURE_LOCATION: ${{ github.event.inputs.location }}
-  APIM_SERVICE_NAME: ${{ github.event.inputs.apimServiceName }}
-
+  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  AZURE_RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP_NAME }}
+  APIM_SERVICE_NAME: ${{ secrets.APIM_INSTANCE_NAME }}
+  APIM_PUBLISHER_EMAIL: ${{ github.event.inputs.APIM_PUBLISHER_EMAIL }}
+  APIM_PUBLISHER_NAME: ${{ github.event.inputs.APIM_PUBLISHER_NAME }}
 jobs:
   validate:
     name: Validate Bicep Template
@@ -67,23 +72,23 @@ jobs:
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
       - name: Validate Bicep template
         uses: azure/arm-deploy@v2
         with:
-          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resourceGroupName: ${{ secrets.RESOURCE_GROUP_NAME }}
+          subscriptionId: ${{ env.AZURE_SUBSCRIPTION_ID }}
+          resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
           template: ./infrastructure/apim.bicep
           parameters: >
             apimServiceName=${{ env.APIM_SERVICE_NAME }}
             resourceGroupName=${{ env.AZURE_RESOURCE_GROUP }}
             location="${{ env.AZURE_LOCATION }}"
             sku=${{ github.event.inputs.sku }}
-            publisherEmail=${{ secrets.APIM_PUBLISHER_EMAIL }}
-            publisherName="${{ secrets.APIM_PUBLISHER_NAME }}"
+            publisherEmail=${{ env.APIM_PUBLISHER_EMAIL }}
+            publisherName="${{ env.APIM_PUBLISHER_NAME }}"
           deploymentMode: Validate
 
   deploy-infrastructure:
