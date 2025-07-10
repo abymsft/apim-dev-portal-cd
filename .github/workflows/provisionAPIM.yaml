@@ -16,12 +16,6 @@ on:
         required: true
         default: 'apimDev003TDC'
         type: string
-      resourceGroupName:
-        description: 'Resource Group Name'
-        required: true
-        default: ${{ secrets.RESOURCE_GROUP_NAME }}
-        type: string
-
       location:
         description: 'Azure Region'
         required: true
