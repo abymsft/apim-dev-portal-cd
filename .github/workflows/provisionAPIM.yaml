@@ -74,7 +74,7 @@ jobs:
           type: deployment
           operation: validate
           scope: resourceGroup
-          subscriptionId: ${{ env.AZURE_SUBSCRIPTION_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
           resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
           template-file: ./infrastructure/apim.bicep
           validation-level: providerNoRbac
@@ -116,7 +116,7 @@ jobs:
           type: deployment
           operation: create
           scope: resourceGroup
-          subscriptionId: ${{ env.AZURE_SUBSCRIPTION_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
           resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
           template-file: ./infrastructure/apim.bicep
           parameters: >
