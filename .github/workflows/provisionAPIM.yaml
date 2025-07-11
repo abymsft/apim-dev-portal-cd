@@ -78,13 +78,15 @@ jobs:
           resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
           template-file: ./infrastructure/apim.bicep
           validation-level: providerNoRbac
-          parameters: >
-            apimServiceName=${{ env.APIM_SERVICE_NAME }}
-            resourceGroupName=${{ env.AZURE_RESOURCE_GROUP }}
-            location="${{ env.AZURE_LOCATION }}"
-            sku=${{ github.event.inputs.sku }}
-            publisherEmail=${{ env.APIM_PUBLISHER_EMAIL }}
-            publisherName="${{ env.APIM_PUBLISHER_NAME }}"
+          parameters: |
+            {
+              "apimServiceName": { "value": "${{ env.APIM_SERVICE_NAME }}" },
+              "resourceGroupName": { "value": "${{ env.AZURE_RESOURCE_GROUP }}" },
+              "location": { "value": "${{ env.AZURE_LOCATION }}" },
+              "sku": { "value": "${{ github.event.inputs.sku }}" },
+              "publisherEmail": { "value": "${{ env.APIM_PUBLISHER_EMAIL }}" },
+              "publisherName": { "value": "${{ env.APIM_PUBLISHER_NAME }}" }
+            }
 
 
   deploy-infrastructure:
@@ -119,13 +121,15 @@ jobs:
           subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
           resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
           template-file: ./infrastructure/apim.bicep
-          parameters: >
-            apimServiceName=${{ env.APIM_SERVICE_NAME }}
-            resourceGroupName=${{ env.AZURE_RESOURCE_GROUP }}
-            location="${{ env.AZURE_LOCATION }}"
-            sku=${{ github.event.inputs.sku }}
-            publisherEmail=${{ env.APIM_PUBLISHER_EMAIL }}
-            publisherName="${{ env.APIM_PUBLISHER_NAME }}"
+          parameters: |
+            {
+              "apimServiceName": { "value": "${{ env.APIM_SERVICE_NAME }}" },
+              "resourceGroupName": { "value": "${{ env.AZURE_RESOURCE_GROUP }}" },
+              "location": { "value": "${{ env.AZURE_LOCATION }}" },
+              "sku": { "value": "${{ github.event.inputs.sku }}" },
+              "publisherEmail": { "value": "${{ env.APIM_PUBLISHER_EMAIL }}" },
+              "publisherName": { "value": "${{ env.APIM_PUBLISHER_NAME }}" }
+            }
 
 
       - name: Display Deployment Results
