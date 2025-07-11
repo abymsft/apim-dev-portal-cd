@@ -41,6 +41,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  id-token: write
 
 env:
   AZURE_LOCATION: ${{ github.event.inputs.location }}
@@ -63,12 +64,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Azure Login
-        uses: azure/login@v2.3.0
+        uses: azure/login@v2
         with:
-          client-id: ${{ env.AZURE_CLIENT_ID }}
-          tenant-id: ${{ env.AZURE_TENANT_ID }}
-          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
-          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Validate Bicep template
         uses: azure/bicep-deploy@v2
@@ -107,19 +105,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Azure Login
-        uses: azure/login@v2.3.0
+        uses: azure/login@v2
         with:
-          client-id: ${{ env.AZURE_CLIENT_ID }}
-          tenant-id: ${{ env.AZURE_TENANT_ID }}
-          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
-          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy APIM Infrastructure
         id: deploy
         uses: azure/bicep-deploy@v2
         with:
           type: deployment
-          operation: validate
+          operation: create
           scope: resourceGroup
           subscriptionId: ${{ env.AZURE_SUBSCRIPTION_ID }}
           resource-group-name: ${{ env.AZURE_RESOURCE_GROUP }}
@@ -161,12 +156,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Azure Login
-        uses: azure/login@v2.3.0
+        uses: azure/login@v2
         with:
-          client-id: ${{ env.AZURE_CLIENT_ID }}
-          tenant-id: ${{ env.AZURE_TENANT_ID }}
-          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
-          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Wait for APIM to be ready
         run: |
